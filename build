@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# very simple build file to get started
+
+# note that there are two options here:
+#   - use custom GCC cross-compiled to the correct target triple
+#   - use generic LLVM/clang and give the triple at compile time
+
+CFLAGS=-Wall -Werror -march=i686-pc-none-elf -ffreestanding -fno-builtin -nostdlib -nostdinc -nostdc++
+
+# compile C source
+clang $CLFAGS -c -o out/kernel.o src/kernel.c || exit 1
+
+# assemble bare asm
+nasm -felf32 src/boot.asm -o out/boot.o || exit 1
+
+# link
+clang -T src/linker/kernel.ld -o out/snrkos.bin -ffreestanding -nostdlib out/kernel.o out/boot.o -lgcc || exit 1
+
+# verify
+grub-file --is-x86-multiboot out/snrkos.bin && { echo "Multiboot verification failed! Aborting." ; exit 1 ; }
+
+# create ISO
+[ -d out/iso ] || mkdir out/iso
+[ -d out/iso/boot ] || mkdir out/iso/boot
+
+echo 'menuentry "snrkos" { multiboot /boot/myos.bin }' > out/iso/boot/grub.cfg
+cp -v out/snrkos.bin out/iso/boot
+grub-mkrescue -o out/snrkos.iso out/iso || exit 1
+
+# done
+echo "OK!"
+
