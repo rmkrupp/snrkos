@@ -6,27 +6,33 @@
 #   - use custom GCC cross-compiled to the correct target triple
 #   - use generic LLVM/clang and give the triple at compile time
 
-CFLAGS=-Wall -Werror -march=i686-pc-none-elf -ffreestanding -fno-builtin -nostdlib -nostdinc -nostdc++
+CFLAGS="-Wall -Werror -m32 -ffreestanding -fno-builtin -nostdlib -nostdinc"
+CFLAGS_L="-Wall -Werror -m32 -ffreestanding -fno-builtin -nostdlib"
+
+[ -d out ] || mkdir out
 
 # compile C source
-clang $CLFAGS -c -o out/kernel.o src/kernel.c || exit 1
+clang $CFLAGS -c -o out/kernel.o src/kernel.c || exit 1
 
 # assemble bare asm
 nasm -felf32 src/boot.asm -o out/boot.o || exit 1
 
 # link
-clang -T src/linker/kernel.ld -o out/snrkos.bin -ffreestanding -nostdlib out/kernel.o out/boot.o -lgcc || exit 1
+clang $CFLAGS_L -o out/snrkos.bin out/kernel.o out/boot.o -lgcc || exit 1
 
 # verify
-grub-file --is-x86-multiboot out/snrkos.bin && { echo "Multiboot verification failed! Aborting." ; exit 1 ; }
+grub-file --is-x86-multiboot2 out/snrkos.bin && { echo "Multiboot verification failed! Aborting." ; exit 1 ; }
 
 # create ISO
 [ -d out/iso ] || mkdir out/iso
 [ -d out/iso/boot ] || mkdir out/iso/boot
+[ -d out/iso/boot/grub ] || mkdir out/iso/boot/grub
 
-echo 'menuentry "snrkos" { multiboot /boot/myos.bin }' > out/iso/boot/grub.cfg
-cp -v out/snrkos.bin out/iso/boot
-grub-mkrescue -o out/snrkos.iso out/iso || exit 1
+echo 'menuentry "snrkos" {
+    multiboot /boot/snrkos.bin
+}' > out/iso/boot/grub.cfg
+cp out/snrkos.bin out/iso/boot/grub
+grub-mkrescue -o out/snrkos.iso out/iso/ || exit 1
 
 # done
 echo "OK!"
