@@ -2,5 +2,13 @@
  *
  * Author: Rebecca Krupp (beka.krupp@gmail.com)
  */
+void kprint(const char * str);
 
-// TODO
+void kmain(void * multiboot_pointer) {
+
+}
+
+void kprint(const char * str) {
+    static char * vga = 0xB8000;
+
+}

@@ -30,8 +30,8 @@ grub-file --is-x86-multiboot2 out/snrkos.bin && { echo "Multiboot verification f
 
 echo 'menuentry "snrkos" {
     multiboot /boot/snrkos.bin
-}' > out/iso/boot/grub.cfg
-cp out/snrkos.bin out/iso/boot/grub
+}' > out/iso/boot/grub/grub.cfg
+cp out/snrkos.bin out/iso/boot
 grub-mkrescue -o out/snrkos.iso out/iso/ || exit 1
 
 # done

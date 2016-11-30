@@ -3,8 +3,6 @@
  * Author: Rebecca Krupp (beka.krupp@gmail.com)
  */
 
-OUTPUT_ARCH(i386)
-
 ENTRY(_start)
 
 SECTIONS
