@@ -1,0 +1,3 @@
+[submodule "libs/quat"]
+	path = libs/quat
+	url = git@github.com:rmkrupp/quat.git
