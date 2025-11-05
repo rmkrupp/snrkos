@@ -28,6 +28,8 @@ int main(int argc, char ** argv)
     (void)argc;
     (void)argv;
 
+    fprintf(stderr, "[engine] (INFO) version "  VERSION "\n");
+
     enum renderer_result result =
         renderer_init(
                 &(struct renderer_configuration) {
