@@ -50,7 +50,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('--cflags', help='override compiler flags (and CFLAGS)')
 parser.add_argument('--ldflags',
-                    help='override compiler flags when linking (and LDFLAGS')
+                    help='override compiler flags when linking (and LDFLAGS)')
 
 parser.add_argument('--cc', help='override cc (and CC)')
 parser.add_argument('--glslc', help='override glslc (and GLSLC)')
