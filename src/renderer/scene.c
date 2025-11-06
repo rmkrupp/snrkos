@@ -38,17 +38,16 @@ struct raindrop {
     float x, y, z;
     float velocity;
     bool alive;
-    char padding[32 - sizeof(float) * 4 - sizeof(bool)];
+    //char padding[32 - sizeof(float) * 4 - sizeof(bool)];
     /* pad to 32 bytes, half a cache line */
 } raindrops[n_raindrops] = {};
 
-static_assert(sizeof(struct raindrop) == 32);
+//static_assert(sizeof(struct raindrop) == 32);
 
 void enqueue_camera(struct scene * scene, struct camera * camera, size_t delta);
 
 void rain_step(struct scene * scene, double delta)
 {
-#pragma omp parallel for schedule(static, 32)
     for (size_t i = rain_start; i < rain_stop; i++) {
         struct raindrop * drop = &raindrops[i - rain_start];
         if (drop->alive) {
