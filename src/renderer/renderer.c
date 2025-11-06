@@ -159,12 +159,13 @@ struct renderer {
     VkDescriptorSet * descriptor_sets;
 
     struct {
-        VkSemaphore image_available, /* have we acquired an image to render
-                                      * to?
-                                      */
-                    render_finished; /* has rendering completed? */
+        VkSemaphore image_available; /* have we acquired an image to render? */
         VkFence in_flight; /* is this frame in flight? */
     } * sync; /* syncronization primitives, indexed by current_frame */
+
+    struct {
+        VkSemaphore render_finished; /* have we finished this image? */
+    } * sync_image;
 
     uint32_t current_frame; /* controls which sync, image, view, framebuffer,
                              * and command buffer we use. always a value
@@ -952,7 +953,8 @@ static enum renderer_result setup_swap_chain()
         );
     renderer.swap_chain_images = malloc(
             sizeof(*renderer.swap_chain_images) *
-            renderer.n_swap_chain_images);
+            renderer.n_swap_chain_images
+        );
     vkGetSwapchainImagesKHR(
             renderer.device,
             renderer.swap_chain,
@@ -960,6 +962,33 @@ static enum renderer_result setup_swap_chain()
             renderer.swap_chain_images
         );
 
+    renderer.sync_image = calloc(
+            renderer.n_swap_chain_images,
+            sizeof(*renderer.sync_image)
+        );
+
+    for (uint32_t i = 0; i < renderer.n_swap_chain_images; i++) {
+        VkSemaphoreCreateInfo semaphore_info = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+        };
+
+        VkResult result = vkCreateSemaphore(
+                renderer.device,
+                &semaphore_info,
+                NULL,
+                &renderer.sync_image[i].render_finished
+            );
+
+        if (result != VK_SUCCESS) {
+            fprintf(
+                    stderr,
+                    "[renderer] vkCreateSemaphore() failed (%d)\n",
+                    result
+                );
+            return RENDERER_ERROR;
+        }
+    }
+ 
     return RENDERER_OKAY;
 }
 
@@ -2527,22 +2556,6 @@ static enum renderer_result setup_sync_objects()
             return RENDERER_ERROR;
         }
 
-        result = vkCreateSemaphore(
-                renderer.device,
-                &semaphore_info,
-                NULL,
-                &renderer.sync[i].render_finished
-            );
-
-        if (result != VK_SUCCESS) {
-            fprintf(
-                    stderr,
-                    "[renderer] vkCreateSemaphore() failed (%d)\n",
-                    result
-                );
-            return RENDERER_ERROR;
-        }
-
         VkFenceCreateInfo fence_info = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
             .flags = VK_FENCE_CREATE_SIGNALED_BIT /* start signalled because the
@@ -2842,6 +2855,13 @@ static enum renderer_result renderer_draw_frame()
             UINT64_MAX
         );
 
+    /* TODO when should this happen? */
+    vkResetFences(
+            renderer.device,
+            1,
+            &renderer.sync[renderer.current_frame].in_flight
+        );
+
     uint32_t image_index;
 
     VkResult result = vkAcquireNextImageKHR(
@@ -2868,13 +2888,6 @@ static enum renderer_result renderer_draw_frame()
     if (renderer.minimized) {
         return RENDERER_OKAY;
     }
-
-    /* TODO when should this happen? */
-    vkResetFences(
-            renderer.device,
-            1,
-            &renderer.sync[renderer.current_frame].in_flight
-        );
 
     vkResetCommandBuffer(renderer.command_buffers[renderer.current_frame], 0);
     if (record_command_buffer(
@@ -2910,7 +2923,7 @@ static enum renderer_result renderer_draw_frame()
         },
         .signalSemaphoreCount = 1,
         .pSignalSemaphores = (VkSemaphore[]) {
-            renderer.sync[renderer.current_frame].render_finished
+            renderer.sync_image[image_index].render_finished
         }
     };
 
@@ -2934,7 +2947,7 @@ static enum renderer_result renderer_draw_frame()
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = (VkSemaphore[]) {
-            renderer.sync[renderer.current_frame].render_finished
+            renderer.sync_image[image_index].render_finished
         },
         .swapchainCount = 1,
         .pSwapchains = (VkSwapchainKHR[]) {
@@ -2964,12 +2977,6 @@ static enum renderer_result renderer_recreate_swap_chain()
                 renderer.sync[i].image_available = NULL;
             }
 
-            if (renderer.sync[i].render_finished) {
-                vkDestroySemaphore(
-                        renderer.device, renderer.sync[i].render_finished, NULL);
-                renderer.sync[i].render_finished = NULL;
-            }
-
             if (renderer.sync[i].in_flight) {
                 vkDestroyFence(
                         renderer.device, renderer.sync[i].in_flight, NULL);
@@ -2978,6 +2985,21 @@ static enum renderer_result renderer_recreate_swap_chain()
         }
 
         free(renderer.sync);
+    }
+
+    if (renderer.sync_image) {
+        for (uint32_t i = 0; i < renderer.n_swap_chain_images; i++) {
+            if (renderer.sync_image[i].render_finished) {
+                vkDestroySemaphore(
+                        renderer.device,
+                        renderer.sync_image[i].render_finished,
+                        NULL
+                    );
+                renderer.sync_image[i].render_finished = NULL;
+            }
+        }
+
+        free(renderer.sync_image);
     }
  
     if (renderer.framebuffers) {
@@ -3241,12 +3263,6 @@ void renderer_terminate()
                 renderer.sync[i].image_available = NULL;
             }
 
-            if (renderer.sync[i].render_finished) {
-                vkDestroySemaphore(
-                        renderer.device, renderer.sync[i].render_finished, NULL);
-                renderer.sync[i].render_finished = NULL;
-            }
-
             if (renderer.sync[i].in_flight) {
                 vkDestroyFence(
                         renderer.device, renderer.sync[i].in_flight, NULL);
@@ -3255,6 +3271,23 @@ void renderer_terminate()
         }
 
         free(renderer.sync);
+        renderer.sync = NULL;
+    }
+
+    if (renderer.sync_image) {
+        for (uint32_t i = 0; i < renderer.n_swap_chain_images; i++) {
+            if (renderer.sync_image[i].render_finished) {
+                vkDestroySemaphore(
+                        renderer.device,
+                        renderer.sync_image[i].render_finished,
+                        NULL
+                    );
+                renderer.sync_image[i].render_finished = NULL;
+            }
+        }
+
+        free(renderer.sync_image);
+        renderer.sync_image = NULL;
     }
 
     if (renderer.vertex_buffer) {
@@ -3356,7 +3389,7 @@ void renderer_terminate()
                 renderer.device,
                 renderer.color_image,
                 NULL
-                );
+            );
         renderer.color_image = NULL;
     }
 
@@ -3365,7 +3398,7 @@ void renderer_terminate()
                 renderer.device,
                 renderer.color_image_view,
                 NULL
-                );
+            );
         renderer.color_image_view = NULL;
     }
 
@@ -3379,7 +3412,7 @@ void renderer_terminate()
                 renderer.device,
                 renderer.depth_image,
                 NULL
-                );
+            );
         renderer.depth_image = NULL;
     }
 
@@ -3388,7 +3421,7 @@ void renderer_terminate()
                 renderer.device,
                 renderer.depth_image_view,
                 NULL
-                );
+            );
         renderer.depth_image_view = NULL;
     }
 
