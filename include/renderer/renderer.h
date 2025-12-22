@@ -33,6 +33,7 @@ enum renderer_result {
 };
 
 struct renderer_configuration {
+    /* single, double, or triple buffering? */
     uint32_t max_frames_in_flight;
 
     /* what size of dfield to load */

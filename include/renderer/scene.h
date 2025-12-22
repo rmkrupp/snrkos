@@ -25,25 +25,37 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* a renderable object */
 struct object {
+    /* should this be rendered? */
     bool enabled;
+    /* does this glow? */
     bool glows;
+    /* is this object rain? */
     bool rain;
+    /* the rotation of the object */
     struct quaternion rotation;
+    /* the objects rotation center */
     float cx, cy, cz;
+    /* the objects position */
     float x, y, z;
+    /* the objects scale */
     float scale;
+    /* the objects velocity (applies to rain) */
     float velocity;
-    uint32_t solid_index,
-             outline_index,
-             glow_index;
+    /* texture indices */
+    uint32_t solid_index, /* where is it transparent or not? */
+             outline_index, /* where does it have an outline? */
+             glow_index; /* where does it glow? */
 };
 
+/* a camera */
 struct camera {
     struct quaternion rotation;
     float x, y, z;
 };
 
+/* a light */
 struct light {
     bool enabled;
     float x, y, z;
@@ -51,6 +63,7 @@ struct light {
     float r, g, b;
 };
 
+/* a scene of objects, textures, and cameras */
 struct scene {
     size_t n_textures;
     const char ** texture_names;
@@ -67,6 +80,7 @@ struct scene {
     size_t n_lights;
 };
 
+/* a series of cameras */
 struct camera_queue {
     struct camera camera;
     size_t delta_time;
