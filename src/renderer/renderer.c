@@ -1233,8 +1233,7 @@ static enum renderer_result setup_logical_device()
         },
         .enabledExtensionCount = sizeof(extensions) / sizeof(*extensions),
         .ppEnabledExtensionNames = extensions,
-        .enabledLayerCount = renderer.n_layers,
-        .ppEnabledLayerNames = renderer.layers
+        .enabledLayerCount = 0
     };
 
     VkResult result = vkCreateDevice(
