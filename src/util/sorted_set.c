@@ -272,16 +272,24 @@ void sorted_set_add_keys_copy(
         } else {
             length = strlen(keys[i]);
         }
-        sorted_set_add_key(
+        sorted_set_add_key_copy(
                 sorted_set,
-                util_strndup(keys[i], length),
+                keys[i],
                 length,
                 data ? data[i] : NULL
             );
     }
 }
 
-/* like sorted_set_add_key, but make a copy of the key first */
+/* like sorted_set_add_key, but make a copy of the key first
+ *
+ * technically this, and the multiple-key version sorted_set_add_keys_copy,
+ * have an inefficiency in the case where large numbers of keys are rejected
+ * for being duplicates: if key duplication could be delayed until AFTER the
+ * key is confirmed unique, by putting the duplication inside the general
+ * sorted_set_add_key algorithm or reproducing the algorithm in the _copy
+ * functions, it could just be skipped for duplicate keys.
+ */
 enum sorted_set_add_key_result sorted_set_add_key_copy(
         struct sorted_set * sorted_set,
         const char * key,
@@ -289,12 +297,18 @@ enum sorted_set_add_key_result sorted_set_add_key_copy(
         void * data
     ) [[gnu::nonnull(1, 2)]]
 {
+    char * duplicate;
     if (length) {
-        return sorted_set_add_key(
-                sorted_set, util_strndup(key, length), length, data);
+        duplicate = util_strndup(key, length);
     } else {
-        return sorted_set_add_key(sorted_set, strdup(key), length, data);
+        duplicate = util_strdup(key);
     }
+    enum sorted_set_add_key_result result =
+        sorted_set_add_key(sorted_set, duplicate, length, data);
+    if (result == SORTED_SET_ADD_KEY_DUPLICATE) {
+        free(duplicate);
+    }
+    return result;
 }
 
 /* apply this function to every key in sorted order
